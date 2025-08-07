@@ -12,8 +12,8 @@ This course offers a hands-on, code-first introduction to machine learning with 
 - _Other resources_: Papers and other resources may be provided throughout the course
 
 ### Exams:
-- _Midterm_: Sep 29/ Oct 1/ Oct 3, type: project proposal/presentation (i.e., define the problem to solve and possible ML approaches that could be applied)
-- _FInal_: Dec 1/ Dec 2 / Dec 3, type: Actuation of the proposed project (code submitted through GitHub + document/slides presenting the results)
+- _Midterm_: Sep 29 / Oct 1 / Oct 3, type: project proposal/presentation (i.e., define the problem to solve and possible ML approaches that could be applied)
+- _FInal_: Dec 1 / Dec 3 / Dec 5, type: Actuation of the proposed project (code submitted through GitHub + document/slides presenting the results)
 
 ### Quick-look calendar
 ![Alt text](images/calendar.png)
