@@ -1,4 +1,5 @@
-# Introduction to Machine Learning for Physics & Astronomy Fall2025
+# Introduction to Deep Learning for data analysis 
+## Physics & Astronomy Fall2025
 This is the repository for the elective course on Machine Learning (Fall 2025)
 
 ### Content: 
