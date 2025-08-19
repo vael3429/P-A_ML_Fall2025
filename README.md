@@ -34,7 +34,7 @@ Students are highly encouraged to attend the [LSU AI Journal Club](https://www.l
 ### What is not considered cheating in this course:
 - Collaborating with others to seek suggestions and feedback—especially from machine learning experts at the AI Journal Club—is not considered cheating; in fact, it is strongly encouraged, provided that others do not write or implement code for you.
 - Similarly, using tools like ChatGPT to help you write code or explore possible machine learning techniques is not only allowed but reflects real-world practices. However, you are still expected to:
-  - Research the methods you decide to use by reading relevant literature and clearly articulating why you chose them for you specific problem.
+  - Research the methods you decide to use by reading relevant literature and clearly articulating why you chose them for your specific problem.
   - Understand and explain your code thoroughly—this includes being able to describe what each part of your implementation does, line by line.
 
 __________________________________________
