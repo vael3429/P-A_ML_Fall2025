@@ -9,7 +9,8 @@ You can find more details on the course outline on the [wiki](https://github.com
 This course offers a hands-on, code-first introduction to machine learning with a focus on deep learning. We will follow the interactive textbook Dive into Deep Learning and use Python and PyTorch throughout the course to implement key algorithms and models. You will gain practical experience by building, training, and analyzing machine learning models, with an emphasis on modern techniques used in research.
 
 ### Resources:
-- _Primary Textbook_: [Dive into Deep Learning](https://d2l.ai) by Aston Zhang, Zachary C. Lipton, Mu Li, and Alexander J. Smola. 
+- _Primary Textbook_ (Free): [Dive into Deep Learning](https://d2l.ai) by Aston Zhang, Zachary C. Lipton, Mu Li, and Alexander J. Smola.
+- _Other Textbooks_ (not Free, not required): Probabilistic Machine Learning, An Introduction - Kevin P. Murphy 
 - _Other resources_: Papers and other resources may be provided throughout the course
 
 ### Exams:
