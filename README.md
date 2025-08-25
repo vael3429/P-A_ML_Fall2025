@@ -10,7 +10,7 @@ This course offers a hands-on, code-first introduction to machine learning with 
 
 ### Resources:
 - _Primary Textbook_ (Free): [Dive into Deep Learning](https://d2l.ai) by Aston Zhang, Zachary C. Lipton, Mu Li, and Alexander J. Smola.
-- _Other Textbooks_ (not Free, not required): Probabilistic Machine Learning, An Introduction - Kevin P. Murphy 
+- _Other Textbook_ (not Free, not required): Probabilistic Machine Learning, An Introduction - Kevin P. Murphy 
 - _Other resources_: Papers and other resources may be provided throughout the course
 
 ### Exams:
