@@ -20,6 +20,9 @@ This course offers a hands-on, code-first introduction to machine learning with 
 ### Quick-look calendar
 ![Alt text](images/calendar.png)
 
+A more detailed calendar is available [here](https://docs.google.com/spreadsheets/d/161N_264dD8lJprTzIt-peCLHdnkwgoNFKvrW_4uoEZI/edit?gid=273294743#gid=273294743) and continuosly updated.
+
+
 ### Expected Background and Prerequisites:
 To get the most out of this course, students are expected to have:
 - Familiarity with object-oriented programming (OOP) concepts and syntax
