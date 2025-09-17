@@ -15,14 +15,17 @@
       pkgs-torchvision = import nixpkgs-torchvision { inherit system; };
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      devShells.${system}.default = pkgs.mkShell {
+      devShells.${system}.default = pkgs-torch.mkShell {
         buildInputs = [
-          pkgs.python3
-          pkgs-torch.python3Packages.torch
-          pkgs-torchvision.python3Packages.torchvision
-          pkgs.python3Packages.pandas
-          pkgs.python3Packages.numpy
-          pkgs.python3Packages.matplotlib
+          (pkgs-torch.python3.withPackages (ps: [
+            ps.torch
+            pkgs-torchvision.python3Packages.torchvision
+            ps.pandas
+            ps.numpy
+            ps.matplotlib
+            ps.pillow
+            ps.ipython
+          ]))
         ];
       };
     };
