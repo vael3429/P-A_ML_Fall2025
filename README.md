@@ -44,4 +44,4 @@ Students are highly encouraged to attend the [LSU AI Journal Club](https://www.l
 
 __________________________________________
 By Michela Negro (Instructor)
-with the help of Mohammad Ali Boroumand (TA)
+with the help of: Nicolò Cibrario (guest lecturer) and Mohammad Ali Boroumand (TA)
