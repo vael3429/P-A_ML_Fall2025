@@ -7,7 +7,7 @@ import json
 
 
 # Define a light curve model (example: stretched exponential rise + decline)
-def light_curve_model(t, t0, A, tau_rise, tau_fall, baseline):
+def LC_model_generic(t, t0, A, tau_rise, tau_fall, baseline):
     """
     Simple parametric light curve model
     t0: peak time
@@ -20,6 +20,28 @@ def light_curve_model(t, t0, A, tau_rise, tau_fall, baseline):
     rise = np.exp(dt / tau_rise)
     fall = np.exp(-dt / tau_fall)
     return baseline + A * rise * fall / (rise + fall)
+
+
+def LC_model_1(t, A, phi, sigma, k, b):
+    """Follows Model 1 from paper
+    phi: starting time of explosion
+    k: determines rise and fall
+    sigma: stretch
+    b: tailing
+    """
+    dt = t - phi
+    coeff = A * ((dt / sigma) ** k)
+    exponential = np.exp(-dt / sigma) * (k ** (-k)) * np.exp(k)
+
+
+def LC_model_2(t, t0, t1, A, B, Tfall, Trise):
+    """Follows the Model 2 from paper
+    A and B are both amplitudes here, allows for a second peak"""
+    dt = t - t0
+    b = 1 + B * ((t - t1) ** 2)
+    numerator = np.exp(-dt / Tfall)
+    denominator = 1 + np.exp(-dt / Trise)
+    return A * b * numerator / denominator
 
 
 def read_supernova_file(filepath):
@@ -37,7 +59,7 @@ def extract_lightcurve_by_band(df, band_columns):
     Returns dict of {band: (times, luminosities)}
     """
     lightcurves = {}
-    time_col = df.columns[0]  # Assuming first column is time
+    time_col = df.columns[0]
 
     for band_col in band_columns:
         if band_col in df.columns:
@@ -51,17 +73,20 @@ def extract_lightcurve_by_band(df, band_columns):
     return lightcurves
 
 
-def fit_light_curve(times, luminosities, model_func=light_curve_model):
+def fit_light_curve(times, luminosities, model_func=LC_model_2):
     """
     Fit light curve to parametric model
     Returns fitted parameters and covariance
     """
-    # Initial parameter guesses
     t_peak_guess = times[np.argmax(luminosities)]
     amp_guess = np.max(luminosities) - np.min(luminosities)
     baseline_guess = np.min(luminosities)
 
-    p0 = [t_peak_guess, amp_guess, 10, 30, baseline_guess]
+    # for the generic model: t0, A, tau_rise, tau_fall, B
+    # p0 = [t_peak_guess, amp_guess, 10, 30, baseline_guess]
+
+    # model 2: t0, t1, A, B, Tfall, Trise
+    p0 = [t_peak_guess, t_peak_guess * 1.01, amp_guess, amp_guess * 0.75, 10, 30]
 
     try:
         popt, pcov = curve_fit(
@@ -70,7 +95,11 @@ def fit_light_curve(times, luminosities, model_func=light_curve_model):
             luminosities,
             p0=p0,
             maxfev=5000,
-            bounds=([0, 0, 0.1, 0.1, -np.inf], [np.inf, np.inf, 100, 200, np.inf]),
+            bounds=(
+                [0, 0, -np.inf, -np.inf, 0.1, 0.1],
+                [np.inf, np.inf, np.inf, np.inf, 100, 100],
+            ),
+            # bounds=([0, 0, 0.1, 0.1, -np.inf], [np.inf, np.inf, 100, 200, np.inf]),
         )
         return popt, pcov, True
     except:
@@ -88,7 +117,7 @@ def plot_light_curve(
 
     # Generate smooth curve for fit
     t_smooth = np.linspace(times.min(), times.max(), 200)
-    fit_curve = light_curve_model(t_smooth, *fit_params)
+    fit_curve = LC_model_2(t_smooth, *fit_params)  # CHANGE MODEL HERE
     plt.plot(t_smooth, fit_curve, "r-", label="Fitted Model", linewidth=2)
 
     plt.xlabel("Time (days)", fontsize=12)
@@ -150,7 +179,7 @@ def process_supernova_dataset(data_dir, output_dir, plot=True):
         }
 
         for band, (times, lums) in lightcurves.items():
-            if len(times) < 5:  # Skip if too few points
+            if len(times) < 10:  # Skip if too few points
                 continue
 
             # Fit light curve
@@ -191,7 +220,9 @@ def process_supernova_dataset(data_dir, output_dir, plot=True):
 # Example usage:
 if __name__ == "__main__":
     # Process all .dat files in 'supernova_data' directory
-    results_df = process_supernova_dataset("/data/Ia", output_dir="/data/Ia", plot=True)
+    results_df = process_supernova_dataset(
+        "/data/Ia", output_dir="/data/Ia/model2", plot=True
+    )
 
     print("\nParameter summary:")
     # print(results_df.describe())
