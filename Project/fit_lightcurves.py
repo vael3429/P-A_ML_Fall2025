@@ -72,6 +72,12 @@ def extract_lightcurve_by_band(df, band_columns):
 
     return lightcurves
 
+def mag_to_flux("""determine if it takes in a whole df or not"""):
+    #this equation is Norman Pogson formula, provides a relative flux 
+    #is fine if we normalize each light curve to peak flux anyway and focus on shape
+    flux =  flux_r*10**(-0.4*(m  - m_r))
+    #can get reference magnitude and flux from various websites, would vary with band
+    return flux
 
 def fit_light_curve(times, luminosities, model_func=LC_model_2):
     """
