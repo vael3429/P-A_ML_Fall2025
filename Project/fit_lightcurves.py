@@ -6,7 +6,7 @@ from pathlib import Path
 import json
 
 
-# Define a light curve model (example: stretched exponential rise + decline)
+# Various light curve models
 def LC_model_generic(t, t0, A, tau_rise, tau_fall, baseline):
     """
     Simple parametric light curve model
@@ -22,16 +22,27 @@ def LC_model_generic(t, t0, A, tau_rise, tau_fall, baseline):
     return baseline + A * rise * fall / (rise + fall)
 
 
-def LC_model_1(t, A, phi, sigma, k, b):
-    """Follows Model 1 from paper
-    phi: starting time of explosion
-    k: determines rise and fall
-    sigma: stretch
-    b: tailing
+def LC_model_1(t, A, phi, sigma, k):
     """
+    Simplified Model 1 from paper
+
+    A : Peak flux
+    phi : Explosion start time
+    sigma : Stretch parameter (width)
+    k : Rise power law index
+    """
+    t = np.asarray(t)
     dt = t - phi
-    coeff = A * ((dt / sigma) ** k)
-    exponential = np.exp(-dt / sigma) * (k ** (-k)) * np.exp(k)
+
+    flux = np.zeros_like(dt, dtype=float)
+    valid_mask = dt >= 0
+
+    if np.any(valid_mask):
+        dt_valid = dt[valid_mask]
+        x = dt_valid / sigma
+        flux[valid_mask] = A * (x**k) * np.exp(k - x)
+
+    return flux
 
 
 def LC_model_2(t, t0, t1, A, B, Tfall, Trise):
@@ -45,13 +56,32 @@ def LC_model_2(t, t0, t1, A, B, Tfall, Trise):
 
 
 def mag_to_flux(magnitudes):
-    # this equation is Norman Pogson formula, provides a relative flux
-    # normalize each lightcurve to peak flux
-    magnitudes = np.asarray(magnitudes)
-    flux = 10 ** (-0.4 * magnitudes)
-    flux_normalized = flux / np.max(flux)
+    """
+    Convert astronomical magnitudes to relative flux.
+    Uses the Pogson formula: flux ∝ 10^(-0.4 * mag)
 
-    return flux_normalized
+    flux_normalized : Relative flux values (normalized so peak = 1)
+    flux_scale : The normalization factor (original peak flux)
+    """
+    magnitudes = np.asarray(magnitudes)
+
+    # Remove any NaN or infinite values before conversion
+    if np.any(~np.isfinite(magnitudes)):
+        print(f"  Warning: Found non-finite magnitude values, filtering them out")
+
+    # Pogson's formula
+    flux = 10 ** (-0.4 * magnitudes)
+
+    # Check for valid flux values
+    if not np.any(np.isfinite(flux)) or np.max(flux) <= 0:
+        print(f"  Warning: Invalid flux values after conversion")
+        return flux, 1.0
+
+    # Normalize to peak flux = 1 for easier fitting
+    max_flux = np.max(flux[np.isfinite(flux)])
+    flux_normalized = flux / max_flux
+
+    return flux_normalized, max_flux
 
 
 def read_supernova_file(filepath):
@@ -79,43 +109,73 @@ def extract_lightcurve_by_band(df, band_columns, convert_mag_to_flux=True):
     Returns:
     --------
     lightcurves : dict
-        {band: (times, flux_values)}
+        {band: (times, flux_values, flux_scale)}
     """
     lightcurves = {}
     time_col = df.columns[0]
 
     for band_col in band_columns:
         if band_col in df.columns:
-            # Filter out NaN values
-            mask = ~df[band_col].isna()
+            # Filter out NaN and infinite values
+            mask = np.isfinite(df[band_col])
             times = df[time_col][mask].values
             values = df[band_col][mask].values
 
-            if len(times) > 0:
+            if len(times) > 0 and len(values) > 0:
                 # Convert magnitudes to flux if needed
                 if convert_mag_to_flux:
-                    flux = mag_to_flux(values)
-                    lightcurves[band_col] = (times, flux)
+                    flux, flux_scale = mag_to_flux(
+                        values
+                    )  # Unpack the two return values
+                    # Double-check normalization worked
+                    finite_flux = flux[np.isfinite(flux)]
+                    if len(finite_flux) > 0 and np.max(finite_flux) > 10:
+                        print(
+                            f"  Warning: Flux not properly normalized for {band_col}, max={np.max(finite_flux):.2e}"
+                        )
+                        # Force renormalization
+                        flux = flux / np.max(finite_flux)
+                    lightcurves[band_col] = (times, flux, flux_scale)
                 else:
-                    lightcurves[band_col] = (times, values)
+                    lightcurves[band_col] = (times, values, 1.0)
 
     return lightcurves
 
 
-def fit_light_curve(times, fluxes, model_func=LC_model_2):
+def fit_light_curve(times, fluxes, model_func):
     """
     Fit light curve to parametric model
-    Returns fitted parameters and covariance
+
+    Parameters:
+    -----------
+    times : array
+        Observation times
+    fluxes : array
+        Flux values (should be normalized, with peak near 1)
+    model_func : callable
+        Light curve model function
+
+    Returns:
+    --------
+    popt : Optimal parameters
+    pcov : Parameter covariance matrix
+    success : Whether fit succeeded
     """
+
+    # these are some guesses for starting the fit
+    # these could be adjusted, sort of just an educated guess
     t_peak_guess = times[np.argmax(fluxes)]
     amp_guess = np.max(fluxes) - np.min(fluxes)
     baseline_guess = np.min(fluxes)
 
-    # for the generic model: t0, A, tau_rise, tau_fall, B
-    # p0 = [t_peak_guess, amp_guess, 10, 30, baseline_guess]
+    """need to change p0 for different fit models
+    and also need to change the bounds below in curve_fit to match"""
+
+    # model 1: A, phi, sigma, k
+    p0 = [amp_guess, t_peak_guess, 30, 20]
 
     # model 2: t0, t1, A, B, Tfall, Trise
-    p0 = [t_peak_guess, t_peak_guess * 1.01, amp_guess, amp_guess * 0.75, 10, 30]
+    # p0 = [t_peak_guess, t_peak_guess * 1.01, amp_guess, amp_guess * 0.75, 10, 30]
 
     try:
         popt, pcov = curve_fit(
@@ -124,15 +184,17 @@ def fit_light_curve(times, fluxes, model_func=LC_model_2):
             fluxes,
             p0=p0,
             maxfev=5000,
+            # model 2 bounds
+            # bounds=([0, 0, -np.inf, -np.inf, 0.1, 0.1],[np.inf, np.inf, np.inf, np.inf, 100, 100],),
+            # model 1 bounds
             bounds=(
-                [0, 0, -np.inf, -np.inf, 0.1, 0.1],
-                [np.inf, np.inf, np.inf, np.inf, 100, 100],
+                [0, 0, 0, 0],
+                [np.inf, np.inf, 500, 500],
             ),
-            # bounds=([0, 0, 0.1, 0.1, -np.inf], [np.inf, np.inf, 100, 200, np.inf]),
         )
         return popt, pcov, True
     except Exception as e:
-        print(f" Fit failed : {e}")
+        print(f"  Fit failed for {len(times)} points: {str(e)[:80]}")
         return p0, None, False
 
 
@@ -145,7 +207,7 @@ def plot_light_curve(times, fluxes, fit_params, band_name, sn_name, save_path=No
 
     # Generate smooth curve for fit
     t_smooth = np.linspace(times.min(), times.max(), 200)
-    fit_curve = LC_model_2(t_smooth, *fit_params)
+    fit_curve = LC_model_1(t_smooth, *fit_params)  # change model here
     plt.plot(t_smooth, fit_curve, "r-", label="Fitted Model", linewidth=2)
 
     plt.xlabel("Time (days)", fontsize=12)
@@ -154,6 +216,12 @@ def plot_light_curve(times, fluxes, fit_params, band_name, sn_name, save_path=No
     plt.legend()
     plt.grid(alpha=0.3)
 
+    # Set reasonable y-axis limits (normalized data should be 0-1 range, plus some margin)
+    y_data_max = np.max(fluxes[np.isfinite(fluxes)])
+    y_data_min = np.min(fluxes[np.isfinite(fluxes)])
+    y_margin = (y_data_max - y_data_min) * 0.2
+    plt.ylim(y_data_min - y_margin, y_data_max + y_margin)
+
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         plt.close()
@@ -161,7 +229,9 @@ def plot_light_curve(times, fluxes, fit_params, band_name, sn_name, save_path=No
         plt.show()
 
 
-def process_supernova_dataset(data_dir, output_dir, plot=True, convert_magnitudes=True):
+def process_supernova_dataset(
+    data_dir, output_dir, model_func, plot=True, convert_magnitudes=True
+):
     """
     Process all .dat files in directory
 
@@ -222,13 +292,13 @@ def process_supernova_dataset(data_dir, output_dir, plot=True, convert_magnitude
             df, band_columns, convert_mag_to_flux=convert_magnitudes
         )
 
-        for band, (times, flux) in lightcurves.items():
+        for band, (times, flux, flux_scale) in lightcurves.items():
             if len(times) < 10:  # Skip if too few points
                 print(f"  Skipping {band}: only {len(times)} observations")
                 continue
 
-            # Fit light curve
-            params, cov, success = fit_light_curve(times, flux)
+            # Fit light curve on normalized data
+            params, cov, success = fit_light_curve(times, flux, model_func)
             total_fits_attempted += 1
 
             # Create parameter dictionary for this fit
@@ -238,10 +308,18 @@ def process_supernova_dataset(data_dir, output_dir, plot=True, convert_magnitude
                 "redshift": redshift,
                 "band": band,
                 "n_obs": len(times),
+                "flux_scale": flux_scale,  # Store normalization factor
             }
 
-            # Store parameters with descriptive names
-            param_names = ["t0", "t1", "A", "B", "Tfall", "Trise"]
+            # Store NORMALIZED parameters (as fitted to normalized data)
+            # These are the parameters your ML model will use
+
+            # model 2
+            # param_names = ["t0", "t1", "A", "B", "Tfall", "Trise"]
+
+            # model 1
+            param_names = ["A", "phi", "sigma", "k"]
+
             for i, pname in enumerate(param_names):
                 sn_params[pname] = params[i]
 
@@ -293,7 +371,7 @@ def process_supernova_dataset(data_dir, output_dir, plot=True, convert_magnitude
             indent=2,
         )
 
-    # Print statistics
+    # Print statistics: successful vs unsuccessful fits
     print("\n" + "=" * 60)
     print("FIT STATISTICS")
     print("=" * 60)
@@ -321,14 +399,16 @@ def process_supernova_dataset(data_dir, output_dir, plot=True, convert_magnitude
 
 # Example usage:
 if __name__ == "__main__":
-    # Process all .dat files in 'supernova_data' directory
+    # change info here for proper directories, fit model, and if you want plots
     successful_df, unsuccessful_df = process_supernova_dataset(
-        "/data/Ia",
-        output_dir="/data/Ia/model2",
+        data_dir="/data/Ia",
+        output_dir="/data/Ia/model1",
+        model_func=LC_model_1,
         plot=True,
-        convert_magnitudes=True,  # Set to False if data is already in flux units
+        convert_magnitudes=True,
     )
 
+    # will print some basic statistics in the end
     print("\n" + "=" * 60)
     print("SUCCESSFUL FITS - Parameter Summary:")
     print("=" * 60)
