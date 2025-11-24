@@ -172,10 +172,10 @@ def fit_light_curve(times, fluxes, model_func):
     and also need to change the bounds below in curve_fit to match"""
 
     # model 1: A, phi, sigma, k
-    p0 = [amp_guess, t_peak_guess, 30, 20]
+    # p0 = [amp_guess, t_peak_guess, 30, 20]
 
     # model 2: t0, t1, A, B, Tfall, Trise
-    # p0 = [t_peak_guess, t_peak_guess * 1.01, amp_guess, amp_guess * 0.75, 10, 30]
+    p0 = [t_peak_guess, t_peak_guess * 1.01, amp_guess, amp_guess * 0.75, 10, 30]
 
     try:
         popt, pcov = curve_fit(
@@ -185,12 +185,15 @@ def fit_light_curve(times, fluxes, model_func):
             p0=p0,
             maxfev=5000,
             # model 2 bounds
-            # bounds=([0, 0, -np.inf, -np.inf, 0.1, 0.1],[np.inf, np.inf, np.inf, np.inf, 100, 100],),
-            # model 1 bounds
             bounds=(
-                [0, 0, 0, 0],
-                [np.inf, np.inf, 500, 500],
+                [0, 0, -np.inf, -np.inf, 0.1, 0.1],
+                [np.inf, np.inf, np.inf, np.inf, 100, 100],
             ),
+            # model 1 bounds
+            # bounds=(
+            #    [0, 0, 0, 0],
+            #    [np.inf, np.inf, 500, 500],
+            # ),
         )
         return popt, pcov, True
     except Exception as e:
@@ -207,7 +210,7 @@ def plot_light_curve(times, fluxes, fit_params, band_name, sn_name, save_path=No
 
     # Generate smooth curve for fit
     t_smooth = np.linspace(times.min(), times.max(), 200)
-    fit_curve = LC_model_1(t_smooth, *fit_params)  # change model here
+    fit_curve = LC_model_2(t_smooth, *fit_params)  # change model here
     plt.plot(t_smooth, fit_curve, "r-", label="Fitted Model", linewidth=2)
 
     plt.xlabel("Time (days)", fontsize=12)
@@ -315,10 +318,10 @@ def process_supernova_dataset(
             # These are the parameters your ML model will use
 
             # model 2
-            # param_names = ["t0", "t1", "A", "B", "Tfall", "Trise"]
+            param_names = ["t0", "t1", "A", "B", "Tfall", "Trise"]
 
             # model 1
-            param_names = ["A", "phi", "sigma", "k"]
+            # param_names = ["A", "phi", "sigma", "k"]
 
             for i, pname in enumerate(param_names):
                 sn_params[pname] = params[i]
@@ -401,9 +404,9 @@ def process_supernova_dataset(
 if __name__ == "__main__":
     # change info here for proper directories, fit model, and if you want plots
     successful_df, unsuccessful_df = process_supernova_dataset(
-        data_dir="/data/Ia",
-        output_dir="/data/Ia/model1",
-        model_func=LC_model_1,
+        data_dir="/data/Candidate",
+        output_dir="/data/Candidate/model2",
+        model_func=LC_model_2,
         plot=True,
         convert_magnitudes=True,
     )
