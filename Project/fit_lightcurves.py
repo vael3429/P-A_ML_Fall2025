@@ -6,22 +6,6 @@ from pathlib import Path
 import json
 
 
-# Various light curve models
-def LC_model_generic(t, t0, A, tau_rise, tau_fall, baseline):
-    """
-    Simple parametric light curve model
-    t0: peak time
-    A: amplitude
-    tau_rise: rise timescale
-    tau_fall: decay timescale
-    baseline: background level
-    """
-    dt = t - t0
-    rise = np.exp(dt / tau_rise)
-    fall = np.exp(-dt / tau_fall)
-    return baseline + A * rise * fall / (rise + fall)
-
-
 def LC_model_1(t, A, phi, sigma, k):
     """
     Simplified Model 1 from paper
@@ -49,7 +33,8 @@ def LC_model_2(t, t0, t1, A, B, Tfall, Trise):
     """Follows the Model 2 from paper
     A and B are both amplitudes here, allows for a second peak"""
     dt = t - t0
-    b = 1 + B * ((t - t1) ** 2)
+    b = 1 + B * np.square(t - t1)
+    b = np.maximum(b, 0)
     numerator = np.exp(-dt / Tfall)
     denominator = 1 + np.exp(-dt / Trise)
     return A * b * numerator / denominator
@@ -93,7 +78,9 @@ def read_supernova_file(filepath):
     return df
 
 
-def extract_lightcurve_by_band(df, band_columns, convert_mag_to_flux=True):
+def extract_lightcurve_by_band(
+    df, band_columns, reduced_bands, convert_mag_to_flux=True
+):
     """
     Extract light curves for each observational band
 
@@ -111,11 +98,17 @@ def extract_lightcurve_by_band(df, band_columns, convert_mag_to_flux=True):
     lightcurves : dict
         {band: (times, flux_values, flux_scale)}
     """
+
     lightcurves = {}
     time_col = df.columns[0]
 
+    # Ensure time column is numeric
+    df[time_col] = pd.to_numeric(df[time_col], errors="coerce")
+
     for band_col in band_columns:
         if band_col in df.columns:
+            # Convert band column to numeric
+            df[band_col] = pd.to_numeric(df[band_col], errors="coerce")
             # Filter out NaN and infinite values
             mask = np.isfinite(df[band_col])
             times = df[time_col][mask].values
@@ -138,6 +131,12 @@ def extract_lightcurve_by_band(df, band_columns, convert_mag_to_flux=True):
                     lightcurves[band_col] = (times, flux, flux_scale)
                 else:
                     lightcurves[band_col] = (times, values, 1.0)
+
+        lightcurves = {
+            band: values
+            for band, values in lightcurves.items()
+            if band in reduced_bands
+        }
 
     return lightcurves
 
@@ -175,7 +174,9 @@ def fit_light_curve(times, fluxes, model_func):
     # p0 = [amp_guess, t_peak_guess, 30, 20]
 
     # model 2: t0, t1, A, B, Tfall, Trise
-    p0 = [t_peak_guess, t_peak_guess * 1.01, amp_guess, amp_guess * 0.75, 10, 30]
+    p0 = [t_peak_guess, t_peak_guess - 30, amp_guess, amp_guess * 0.50, 10, 30]
+
+    t_min, t_max = np.min(times), np.max(times)
 
     try:
         popt, pcov = curve_fit(
@@ -285,18 +286,19 @@ def process_supernova_dataset(
         df = read_supernova_file(dat_file)
         sn_name = df.iloc[0, 1] if len(df) > 0 else dat_file.stem
         sn_type = df.iloc[0, 2] if len(df) > 0 else "Unknown"
-        redshift = df.iloc[0, 3] if len(df) > 0 else np.nan
+        # redshift = df.iloc[0, 3] if len(df) > 0 else np.nan
 
         # Identify band columns (skip time, name, type, redshift, and error columns)
         band_columns = [col for col in df.columns[4:] if "err" not in col.lower()]
+        desired_bands = ["g'", "r'", "i'", "z'", "u'", "G"]
 
         # Extract and fit each band (with magnitude conversion)
         lightcurves = extract_lightcurve_by_band(
-            df, band_columns, convert_mag_to_flux=convert_magnitudes
+            df, band_columns, desired_bands, convert_mag_to_flux=convert_magnitudes
         )
 
         for band, (times, flux, flux_scale) in lightcurves.items():
-            if len(times) < 10:  # Skip if too few points
+            if len(times) < 4:  # Skip if too few points
                 print(f"  Skipping {band}: only {len(times)} observations")
                 continue
 
@@ -308,10 +310,10 @@ def process_supernova_dataset(
             sn_params = {
                 "supernova": sn_name,
                 "type": sn_type,
-                "redshift": redshift,
+                # "redshift": redshift,
                 "band": band,
-                "n_obs": len(times),
-                "flux_scale": flux_scale,  # Store normalization factor
+                # "n_obs": len(times),
+                # "flux_scale": flux_scale,  # Store normalization factor
             }
 
             # Store NORMALIZED parameters (as fitted to normalized data)
@@ -404,10 +406,10 @@ def process_supernova_dataset(
 if __name__ == "__main__":
     # change info here for proper directories, fit model, and if you want plots
     successful_df, unsuccessful_df = process_supernova_dataset(
-        data_dir="/data/Candidate",
-        output_dir="/data/Candidate/model2",
+        data_dir="/data/IIn",
+        output_dir="/data/IIn/model2",
         model_func=LC_model_2,
-        plot=True,
+        plot=False,
         convert_magnitudes=True,
     )
 
