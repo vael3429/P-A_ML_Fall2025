@@ -45,8 +45,6 @@ def mag_to_flux(magnitudes):
     Convert astronomical magnitudes to relative flux.
     Uses the Pogson formula: flux ∝ 10^(-0.4 * mag)
 
-    flux_normalized : Relative flux values (normalized so peak = 1)
-    flux_scale : The normalization factor (original peak flux)
     """
     magnitudes = np.asarray(magnitudes)
 
@@ -54,7 +52,7 @@ def mag_to_flux(magnitudes):
     if np.any(~np.isfinite(magnitudes)):
         print(f"  Warning: Found non-finite magnitude values, filtering them out")
 
-    # Pogson's formula
+# Pogson's formula
     flux = 10 ** (-0.4 * magnitudes)
 
     # Check for valid flux values
@@ -166,9 +164,6 @@ def fit_light_curve(times, fluxes, model_func):
     t_peak_guess = times[np.argmax(fluxes)]
     amp_guess = np.max(fluxes) - np.min(fluxes)
     baseline_guess = np.min(fluxes)
-
-    """need to change p0 for different fit models
-    and also need to change the bounds below in curve_fit to match"""
 
     # model 1: A, phi, sigma, k
     # p0 = [amp_guess, t_peak_guess, 30, 20]
